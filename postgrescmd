@@ -1,0 +1,2 @@
+docker run -v /apace-development/data:/var/lib/postgresql/data -p 5566:5432 --name apace-db -e POSTGRES_PASSWORD=mysecretpassword -d postgres
+docker run -p 5673:5673 -d rabbitmq

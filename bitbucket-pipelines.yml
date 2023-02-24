@@ -1,0 +1,105 @@
+image: node:12.18
+
+pipelines:
+  branches:
+    staging:
+      - step:
+          name: "Compress application"
+          script:
+            - apt-get update && apt-get install -y zip
+            # - npm i
+            - zip -r server.zip .
+          artifacts:
+            - server.zip
+      - step:
+          name: "Deploy to ElasticBeanstalk"
+          script:
+            - pipe: atlassian/aws-elasticbeanstalk-deploy:0.5.0
+              variables:
+                AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+                AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+                AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+                S3_BUCKET: 'elasticbeanstalk-us-east-1-013054214203'
+                APPLICATION_NAME: "apace-payments-server"
+                ENVIRONMENT_NAME: 'staging'
+                ZIP_FILE: "server.zip"
+    master:
+      - step:
+          name: "Compress application"
+          script:
+            - apt-get update && apt-get install -y zip
+            # - npm i
+            - zip -r server.zip .
+          artifacts:
+            - server.zip
+      - step:
+          name: "Deploy to ElasticBeanstalk"
+          script:
+            - pipe: atlassian/aws-elasticbeanstalk-deploy:0.5.0
+              variables:
+                AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+                AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+                AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+                S3_BUCKET: 'elasticbeanstalk-us-east-1-013054214203'
+                APPLICATION_NAME: "apace-payments-server"
+                ENVIRONMENT_NAME: 'production'
+                ZIP_FILE: "server.zip"
+
+
+# SETTINGS FOR AWS APP RUNNER
+# pipelines:
+#   branches:
+#     staging:
+#       - step:
+#           max-time: 20
+#           size: 2x
+#           name: 'Building Docker image'
+#           services:
+#             - docker
+#           script:
+#             - echo "Starting build"
+#             - export NODE_OPTIONS=--max_old_space_size=3072
+#             - docker build --build-arg NODE_ENV=development -t apace-server-dev:latest .
+#             - pipe: atlassian/aws-ecr-push-image:1.4.1
+#               variables:
+#                 AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+#                 AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+#                 AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+#                 IMAGE_NAME: apace-server-dev
+
+#   custom:
+#     build-dev:
+#       - step:
+#           max-time: 20
+#           size: 2x
+#           name: 'Building Docker image'
+#           services:
+#             - docker
+#           script:
+#             - echo "Starting build"
+#             - export NODE_OPTIONS=--max_old_space_size=3072
+#             - docker build --build-arg NODE_ENV=development -t apace-server-dev:latest .
+#             - pipe: atlassian/aws-ecr-push-image:1.4.1
+#               variables:
+#                 AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+#                 AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+#                 AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+#                 IMAGE_NAME: apace-server-dev
+
+#     build-production:
+#       - step:
+#           max-time: 20
+#           size: 2x
+#           name: 'Building Docker image'
+#           services:
+#             - docker
+#           script:
+#             - echo "Starting build"
+#             - export NODE_OPTIONS=--max_old_space_size=3072
+#             - docker build --build-arg NODE_ENV=production -t apace-server-prod:latest .
+#             - pipe: atlassian/aws-ecr-push-image:1.4.1
+#               variables:
+#                 AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+#                 AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+#                 AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+#                 IMAGE_NAME: apace-server-prod

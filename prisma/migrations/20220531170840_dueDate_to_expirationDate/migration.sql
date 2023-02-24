@@ -1,0 +1,1 @@
+ALTER TABLE "Refund" RENAME COLUMN "dueDate" TO "expirationDate";

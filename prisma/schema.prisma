@@ -1,0 +1,588 @@
+generator client {
+    provider        = "prisma-client-js"
+    previewFeatures = ["referentialActions"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id                  Int         @id @default(autoincrement())
+  phone               String
+  firstName           String
+  lastName            String
+  email               String      @unique
+  password            String?
+  allow_twostepverify Boolean     @default(false)
+  role                Role        @default(Admin)
+  lastLoginAt         DateTime?
+  status              AdminStatus @default(INVITED)
+  setPasswordToken    String?
+  Log                 Log[]
+}
+
+model Customer {
+  id                  Int            @id @default(autoincrement())
+  phone               String         @unique
+  firstName           String
+  lastName            String
+  email               String         @unique
+  lastUpdated         DateTime?      @updatedAt
+  createdAt           DateTime       @default(now())
+  ssn                 String?
+  aptpayErrorCode     String?
+  aptpayId            String?
+  aptpayStatus        String?
+  address1            String         @default("")
+  address2            String?
+  city                String         @default("")
+  state               String         @default("")
+  zip                 String         @default("")
+  dob                 String?
+  ssnLastFour         String?
+  status              String         @default("active")
+  CustomerCard        CustomerCard[]
+  refunds             Refund[]
+  disabledFromVendors Vendor[]
+}
+
+model CustomerCard {
+    id   Int    @id @default(autoincrement())
+    name String
+    type CcType
+
+    fullName String
+
+    network        String?
+    number         String
+    expirationDate String?
+    cvv            String
+    lastFour       String
+    firstSix       String?
+
+    fundsAvailability String?
+    currency          String?
+
+    customerId Int
+    customer   Customer @relation(fields: [customerId], references: [id])
+
+    createdAt   DateTime @default(now())
+    Refund      Refund[]
+    RefundLocks Refund[] @relation("locked_to_card")
+}
+
+model Invoice {
+    id                  Int           @id @default(autoincrement())
+    invoiceNumber       Int?
+    date                DateTime
+    vendorId            String
+    vendor              Vendor        @relation(fields: [vendorId], references: [id])
+    refunds             Refund[]
+    totalAmount         Decimal       @db.Decimal(10, 2)
+    status              InvoiceStatus @default(unpaid)
+    quickbooksId        String?
+    quickbooksSyncToken String?
+
+    chargeId        String?
+    chargeStatus    String?
+    chargeProcessor InvoiceChargeProcessor @default(stripe)
+    chargeInfo      String?
+    paymentCardId       Int?
+    paymentCard         VendorCard?   @relation(fields: [paymentCardId], references: [id])
+    vendorPaymentMethodId Int?
+    vendorPaymentMethod VendorPaymentMethod? @relation(fields: [vendorPaymentMethodId], references: [id])
+
+    dueDate       DateTime
+    transaction   String?
+    paymentMethod String?
+    notes         String?
+    createdAt     DateTime  @default(now())
+    lastUpdated   DateTime? @updatedAt
+}
+
+model Vendor {
+    id                  String                     @id @default(uuid())
+    email               String                     @unique
+    ownerFirstName      String?
+    ownerLastName       String?
+    commercialName      String?                    @unique
+    website             String?
+    industry            String?
+    consent             String?
+    avg_monthly_refunds AverageMonthlyRefundsEnum?
+    allow_notify        Boolean                    @default(false)
+    allow_twostepverify Boolean                    @default(false)
+    allow_autopay       Boolean                    @default(false)
+
+    setupEnabled           Boolean  @default(true)
+    revenueShareEnabled    Boolean  @default(false)
+    revenueSharePercentage Decimal? @default(0.5) @db.Decimal(10, 2)
+    password               String
+    ecommerce_platform     String?
+    phone                  String?  @unique
+    profilePictureUrl      String?
+    logoUrl                String?
+    entity                 String?
+    ein                    String?
+    annualRevenue          String?
+    dailyReturns           String?
+    avgItemPrice           String?
+
+    aptpayId            String?
+    quickbooksId        String?
+    quickbooksSyncToken String?
+    stripeId            String?
+
+    dailyReportEnabled Boolean @default(true)
+
+    street_1 String?
+    street_2 String?
+    city     String?
+    state    String?
+    zip      String?
+    country  String?
+
+    dateOfIncorporation String? // MM/YYYY
+    dbaName             String?
+
+    owner_firstname String?
+    owner_lastname  String?
+    owner_dob       String?
+    owner_ssn       String?
+    owner_phone     String?
+
+    invoicingCycleType VendorInvoicingCycleType @default(BiWeekly)
+    lastInvoicedAt     DateTime                 @default(now())
+
+    defaultCardId Int?
+    defaultCard   VendorCard? @relation("default_card", fields: [defaultCardId], references: [id])
+
+    defaultPaymentMethodId Int?
+    defaultPaymentMethod   VendorPaymentMethod? @relation("default_payment_method", fields: [defaultPaymentMethodId], references: [id])
+    agreementSigned        Boolean              @default(false)
+    agreementDate          DateTime?
+    agreementUrl           String?
+
+    refundListStatuses          RefundStatus[]
+    refunds                     Refund[]
+    disabledCustomers           Customer[]
+    invoices                    Invoice[]
+    revenueShares               RevenueShare[]
+    totalRevenueShareAmount     Decimal?              @default(0) @db.Decimal(10, 2)
+    availableRevenueShareAmount Decimal?              @default(0) @db.Decimal(10, 2)
+    paidRevenueShareAmount      Decimal?              @default(0) @db.Decimal(10, 2)
+    payouts                     Payout[]
+    invoiceDueInterval          Int                   @default(1) // In days
+    status                      VendorStatus          @default(CREATED)
+    approvedByDNB               Boolean               @default(false)
+    defaultFundingSource        String?
+    webhookSubscriptions        WebhookSubscription[]
+    vendorCards                 VendorCard[]
+    vendorBankAccounts          VendorBankAccount[]
+    vendorPaymentMethods        VendorPaymentMethod[]
+
+    createdAt   DateTime  @default(now())
+    lastUpdated DateTime? @updatedAt
+}
+
+model VendorPaymentMethod {
+    id Int @id @default(autoincrement())
+
+    type PaymentMethod
+
+    vendorId String
+    vendor   Vendor @relation(fields: [vendorId], references: [id])
+
+    vendorCardId Int?
+    vendorCard   VendorCard? @relation(fields: [vendorCardId], references: [id], onDelete: Cascade)
+
+    vendorBankAccountId Int?
+    vendorBankAccount   VendorBankAccount? @relation(fields: [vendorBankAccountId], references: [id], onDelete: Cascade)
+
+    invoices Invoice[]
+    createdAt DateTime @default(now())
+    Vendor    Vendor[] @relation("default_payment_method")
+}
+
+model VendorCard {
+    id   Int    @id @default(autoincrement())
+    name String
+    type CcType
+
+    fullName String
+
+    network                 String?
+    number                  String
+    stripeId                String?
+    expirationDate          String?
+    expirationDateEncrypted Boolean @default(true)
+    cvv                     String
+    lastFour                String
+    firstSix                String?
+
+    fundsAvailability String?
+    currency          String?
+
+    vendorId String
+    vendor   Vendor @relation(fields: [vendorId], references: [id])
+
+    invoices  Invoice[]
+    Vendor              Vendor[]              @relation("default_card")
+    vendorPaymentMethod VendorPaymentMethod[]
+    createdAt           DateTime              @default(now())
+}
+
+model VendorBankAccount {
+    id Int @id @default(autoincrement())
+
+    name                  String
+    routingNumber         String
+    routingNumberLastFour String
+
+    accountNumber         String
+    accountNumberLastFour String
+
+    vendorId String
+    vendor   Vendor @relation(fields: [vendorId], references: [id])
+
+    vendorPaymentMethod VendorPaymentMethod[]
+
+    createdAt DateTime @default(now())
+}
+
+model Refund {
+  id                   String               @id @default(uuid())
+  amount               Decimal              @db.Decimal(10, 2)
+  refundDate           DateTime?
+  expirationDate       DateTime
+  orderId              String
+  cardLastFour         String?
+  status               RefundStatus         @default(initialized)
+  agreementDate        DateTime?
+  customerId           Int?
+  vendorId             String?
+  invoiceId            Int?
+  createdAt            DateTime             @default(now())
+  lastUpdated          DateTime?            @updatedAt
+  productIds           String[]
+  cardType             CcType?
+  refundNotificationId Int?
+  refundVerificationId Int?
+  refundLink           String?
+  customerEmail        String?
+  customerFName        String?
+  customerLName        String?
+  emailOpenedAt        DateTime?
+  emailSent            Boolean              @default(false)
+  lastStep             Int                  @default(0)
+  linkClickedAt        DateTime?
+  orderUrl             String?
+  customerCardId       Int?
+  orderDate            String?
+  emailSentAt          DateTime?
+  refundDepositedAt    DateTime?
+  cardLastFourVerified Boolean              @default(false)
+  refundNumber         Int?
+  expired              Boolean              @default(false)
+  vendorTokenPublicId  String?
+  disabled             Boolean              @default(false)
+  lockedToCardId       Int?
+  transactionId        Int?
+  isPartialRefund      Boolean              @default(false)
+  termsDate            DateTime?
+  feeAmount            Decimal?             @db.Decimal(10, 2)
+  agreementUrl         String?
+  customerCard         CustomerCard?        @relation(fields: [customerCardId], references: [id])
+  customer             Customer?            @relation(fields: [customerId], references: [id])
+  invoice              Invoice?             @relation(fields: [invoiceId], references: [id])
+  lockedToCard         CustomerCard?        @relation("locked_to_card", fields: [lockedToCardId], references: [id])
+  refundNotification   RefundNotification?  @relation(fields: [refundNotificationId], references: [id])
+  refundVerification   RefundVerification?  @relation(fields: [refundVerificationId], references: [id])
+  transaction          RefundTransaction?   @relation(fields: [transactionId], references: [id])
+  vendor               Vendor?              @relation(fields: [vendorId], references: [id])
+  vendorToken          VendorToken?         @relation(fields: [vendorTokenPublicId], references: [publicId])
+  refundItems          RefundItem[]
+  refundWebhookEvent   RefundWebhookEvent[]
+  revenueShare         RevenueShare?
+  webhookEvents        WebhookEvent[]
+}
+
+model RefundItem {
+  id           Int      @id @default(autoincrement())
+  itemId       String
+  sku          String?
+  itemUrl      String?
+  itemImageUrl String?
+  displayName  String
+  returnDate   String?
+  unitPrice    Decimal? @db.Decimal(10, 2)
+  returnQty    Int?
+  refundId     String
+  refund       Refund   @relation(fields: [refundId], references: [id])
+}
+
+model RefundVerification {
+  id     Int            @id @default(autoincrement())
+  method RequestMethod? @default(get)
+  url    String
+  refund Refund[]
+}
+
+model RefundNotification {
+  id             Int           @id @default(autoincrement())
+  webhookUrl     String
+  redirectUrl    String?
+  redirectMethod RequestMethod @default(post)
+  refund         Refund[]
+}
+
+model RefundTransaction {
+  id            Int                        @id @default(autoincrement())
+  transactionId String
+  status        String?
+  errorCode     String?
+  errorMessage  String?
+  info          String?
+  processor     RefundTransactionProcessor
+  refund        Refund[]
+}
+
+model VerifyCode {
+  id       Int      @id @default(autoincrement())
+  method   String
+  code     Int
+  used     Boolean  @default(false)
+  expireAt DateTime
+}
+
+model WebhookSubscription {
+  id          Int            @id @default(autoincrement())
+  vendorId    String
+  url         String
+  key         String
+  enabled     Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  lastUpdated DateTime?      @updatedAt
+  lastUsedAt  DateTime?
+  vendor      Vendor         @relation(fields: [vendorId], references: [id])
+  events      WebhookEvent[]
+
+  @@unique([vendorId, url])
+}
+
+model WebhookEvent {
+  id             Int                 @id @default(autoincrement())
+  refundId       String
+  subscriptionId Int
+  sent           Boolean             @default(false)
+  trials         Int                 @default(0)
+  lastTrialAt    DateTime?
+  refund         Refund              @relation(fields: [refundId], references: [id])
+  subscription   WebhookSubscription @relation(fields: [subscriptionId], references: [id])
+
+  @@unique([refundId, subscriptionId])
+}
+
+model RefundWebhookEvent {
+  id          Int       @id @default(autoincrement())
+  refundId    String
+  sent        Boolean   @default(false)
+  trials      Int       @default(0)
+  lastTrialAt DateTime?
+  refund      Refund    @relation(fields: [refundId], references: [id])
+}
+
+model VendorToken {
+  publicId   String    @id
+  name       String
+  secret     String
+  vendorId   String
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  refunds    Refund[]
+}
+
+model GlobalSiteSetting {
+  id    Int     @id @default(autoincrement())
+  key   String  @unique
+  value String?
+}
+
+model Log {
+  id            Int      @id @default(autoincrement())
+  action        String
+  actionOn      String
+  createdAt     DateTime @default(now())
+  description   String?
+  oldValues     Json?
+  newValues     Json?
+  updatedFields String[]
+  level         LogLevel @default(info)
+  model         String
+  updatedById   Int?
+  updatedBy     Admin?   @relation(fields: [updatedById], references: [id])
+}
+
+model RevenueShare {
+  id             Int      @id @default(autoincrement())
+  amount         Decimal  @db.Decimal(10, 2)
+  percentage     Decimal  @db.Decimal(10, 2)
+  createdAt      DateTime @default(now())
+  refundId       String   @unique
+  vendorId       String
+  hasPaidInvoice Boolean  @default(false)
+  refund         Refund   @relation(fields: [refundId], references: [id])
+  vendor         Vendor   @relation(fields: [vendorId], references: [id])
+}
+
+model Payout {
+  id                  Int                @id @default(autoincrement())
+  amount              Decimal            @db.Decimal(10, 2)
+  status              String?
+  vendorId            String
+  createdAt           DateTime           @default(now())
+  transactionId       String?
+  bankAccountPayoutId Int?
+  cardPayoutId        Int?
+  toId                Int?
+  toType              PayoutToType?
+  bankAccountPayout   BankAccountPayout? @relation(fields: [bankAccountPayoutId], references: [id])
+  cardPayout          CardPayout?        @relation(fields: [cardPayoutId], references: [id])
+  vendor              Vendor             @relation(fields: [vendorId], references: [id])
+}
+
+model CardPayout {
+  id           Int      @id @default(autoincrement())
+  cardLastFour String?
+  createdAt    DateTime @default(now())
+  cardNetwork  String?
+  payout       Payout[]
+}
+
+model BankAccountPayout {
+  id                    Int      @id @default(autoincrement())
+  accountNumberLastFour String?
+  routingNumberLastFour String?
+  createdAt             DateTime @default(now())
+  payout                Payout[]
+}
+
+model QuickbooksSalesAccount {
+  id                  Int      @id @default(autoincrement())
+  type                String
+  quickbooksId        String
+  quickbooksSyncToken String
+  createdAt           DateTime @default(now())
+  quickbooksName      String
+  subType             String
+}
+
+enum Role {
+  Admin
+  SuperAdmin
+}
+
+enum PayoutToType {
+  CARD
+  BANK_ACCOUNT
+}
+
+enum LogLevel {
+  info
+  error
+  warn
+  debug
+}
+
+enum CcType {
+  credit
+  debit
+}
+
+enum RefundStatus {
+  initialized
+  receiverVerified
+  pending
+  processed
+  failed
+  canceled
+  viewed
+  refundByVendor
+}
+
+enum InvoiceStatus {
+    unpaid
+    pending
+    paid
+}
+
+enum PaymentMethod {
+  card
+  bank
+}
+
+enum IndustryEnum {
+  Auto
+  Beauty
+  ElectiveMedical
+  Fashion
+  FitnessAndSportingGoods
+  Home
+  HomeImprovement
+  Lifestyle
+  MobileDevices
+  Travel
+  Other
+}
+
+enum AverageMonthlyRefundsEnum {
+  PreLaunch
+  LessThan100K
+  From100KTo500K
+  From500KTo1M
+  From1MAndUp
+}
+
+enum RequestMethod {
+  get
+  post
+  patch
+  put
+  delete
+}
+
+enum RefundSource {
+  app
+  api
+}
+
+enum RefundTransactionProcessor {
+  aptpay
+}
+
+enum InvoiceChargeProcessor {
+    stripe
+    aptpay
+}
+
+enum VendorStatus {
+  CREATED
+  SUBMITTED
+  PENDING_REVIEW
+  ACTIVE
+  DISABLED
+  ARCHIVED
+}
+
+enum AdminStatus {
+  INVITED
+  ACTIVE
+}
+
+enum VendorInvoicingCycleType {
+  Daily
+  TenDays
+  BiWeekly
+}
